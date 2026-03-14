@@ -154,7 +154,17 @@ container system start
 container system status
 ```
 
-**Image build fails:**
+**Image build fails with DNS resolution errors ("Temporary failure resolving"):**
+Apple Container uses macOS `mDNSResponder` on `*:53` for VM DNS. If anything else occupies port 53 (VPN, dnsmasq, etc.), DNS breaks. See [#402](https://github.com/apple/container/issues/402), [#656](https://github.com/apple/container/issues/656). Fix:
+```bash
+# Option A: Restart builder with explicit DNS
+container builder stop && container builder rm && container builder start --dns 8.8.8.8
+# Option B: Patch running builder
+container exec buildkit /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+```
+Then retry `./container/build.sh`. If on a VPN that blocks external DNS (e.g. Mullvad), disconnect for the build.
+
+**Image build fails (other / cache issues):**
 ```bash
 # Clean rebuild — Apple Container caches aggressively
 container builder stop && container builder rm && container builder start
