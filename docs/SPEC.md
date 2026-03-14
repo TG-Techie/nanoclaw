@@ -310,7 +310,7 @@ nanoclaw/
 │
 ├── data/                          # Application state (gitignored)
 │   ├── sessions/                  # Per-group session data (.claude/ dirs with JSONL transcripts)
-│   ├── env/env                    # Copy of .env for container mounting
+│   ├── env/                       # (unused — credential proxy replaced file-based env injection)
 │   └── ipc/                       # Container IPC (messages/, tasks/)
 │
 ├── logs/                          # Runtime logs (gitignored)
@@ -397,7 +397,7 @@ The token can be extracted from `~/.claude/.credentials.json` if you're logged i
 ANTHROPIC_API_KEY=sk-ant-api03-...
 ```
 
-Only the authentication variables (`CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY`) are extracted from `.env` and written to `data/env/env`, then mounted into the container at `/workspace/env-dir/env` and sourced by the entrypoint script. This ensures other environment variables in `.env` are not exposed to the agent. This workaround is needed because some container runtimes lose `-e` environment variables when using `-i` (interactive mode with piped stdin).
+The host process reads `.env` via `readEnvFile()` (`src/env.ts`) and starts a credential proxy (`src/credential-proxy.ts`). Containers receive `ANTHROPIC_BASE_URL` pointing at the proxy plus a placeholder token — the proxy intercepts API calls and injects the real credentials. The `.env` file is actively shadowed with `/dev/null` inside containers so agents never see secrets directly.
 
 ### Changing the Assistant Name
 

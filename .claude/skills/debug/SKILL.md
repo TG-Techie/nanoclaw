@@ -17,7 +17,6 @@ src/container-runner.ts               container/agent-runner/
     │ spawns container                      │ runs Claude Agent SDK
     │ with volume mounts                   │ with MCP servers
     │                                      │
-    ├── data/env/env ──────────────> /workspace/env-dir/env
     ├── groups/{folder} ───────────> /workspace/group
     ├── data/ipc/{folder} ────────> /workspace/ipc
     ├── data/sessions/{folder}/.claude/ ──> /home/node/.claude/ (isolated per-group)
@@ -179,14 +178,14 @@ If an MCP server fails to start, the agent may exit. Check the container logs fo
 
 ### Test the full agent flow:
 ```bash
-# Set up env file
-mkdir -p data/env groups/test
-cp .env data/env/env
+# Set up test group folder
+mkdir -p groups/test
 
-# Run test query
+# Run test query (credentials are injected by the credential proxy at runtime;
+# for manual testing, pass them via -e flags)
 echo '{"prompt":"What is 2+2?","groupFolder":"test","chatJid":"test@g.us","isMain":false}' | \
   docker run -i \
-  -v $(pwd)/data/env:/workspace/env-dir:ro \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   -v $(pwd)/groups/test:/workspace/group \
   -v $(pwd)/data/ipc:/workspace/ipc \
   nanoclaw-agent:latest
@@ -325,10 +324,7 @@ echo "=== Checking NanoClaw Container Setup ==="
 echo -e "\n1. Authentication configured?"
 [ -f .env ] && (grep -q "CLAUDE_CODE_OAUTH_TOKEN=sk-" .env || grep -q "ANTHROPIC_API_KEY=sk-" .env) && echo "OK" || echo "MISSING - add CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY to .env"
 
-echo -e "\n2. Env file copied for container?"
-[ -f data/env/env ] && echo "OK" || echo "MISSING - will be created on first run"
-
-echo -e "\n3. Container runtime running?"
+echo -e "\n2. Container runtime running?"
 docker info &>/dev/null && echo "OK" || echo "NOT RUNNING - start Docker Desktop (macOS) or sudo systemctl start docker (Linux)"
 
 echo -e "\n4. Container image exists?"

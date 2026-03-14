@@ -206,8 +206,6 @@ TELEGRAM_BOT_TOKEN=<your-token-from-botfather>
 ASSISTANT_NAME=nanoclaw
 ANTHROPIC_API_KEY=proxy-managed
 EOF
-mkdir -p data/env && cp .env data/env/env
-
 # Register your chat
 npx tsx setup/index.ts --step register \
   --jid "tg:<your-chat-id>" \
@@ -245,8 +243,6 @@ cat > .env << EOF
 ASSISTANT_NAME=nanoclaw
 ANTHROPIC_API_KEY=proxy-managed
 EOF
-mkdir -p data/env && cp .env data/env/env
-
 # Authenticate (choose one):
 
 # QR code — scan with WhatsApp camera:
