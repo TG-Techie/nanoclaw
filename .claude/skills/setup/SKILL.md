@@ -78,7 +78,8 @@ Check the preflight results for `APPLE_CONTAINER` and `DOCKER`, and the PLATFORM
 
 - PLATFORM=linux → Docker (only option)
 - PLATFORM=macos + APPLE_CONTAINER=installed → Use `AskUserQuestion: Docker (cross-platform) or Apple Container (native macOS)?` If Apple Container, run `/convert-to-apple-container` now, then skip to 3c.
-- PLATFORM=macos + APPLE_CONTAINER=not_found → Docker
+- PLATFORM=macos + APPLE_CONTAINER=not_found → Use `AskUserQuestion: Would you like to use Apple Container (native macOS, recommended) or Docker?` If Apple Container, install via `brew install container`, then `container system start` (user may need to approve kernel install interactively). Then run `/convert-to-apple-container`.
+- If neither Apple Container nor Docker is available and user declines both → cannot proceed
 
 ### 3a-docker. Install Docker
 
@@ -104,10 +105,31 @@ grep -q "CONTAINER_RUNTIME_BIN = 'container'" src/container-runtime.ts && echo "
 
 ### 3c. Build and test
 
-Run `npx tsx setup/index.ts --step container -- --runtime <chosen>` and parse the status block.
+**Apple Container DNS preflight (MUST do before building):**
+
+The Apple Container builder VM's default nameserver (`192.168.64.1`, the vmnet gateway) does not forward DNS. Builds will fail with `Temporary failure resolving` unless DNS is explicitly configured. This is true even on a clean system with no VPN and nothing on port 53. Tracked upstream: [apple/container#402](https://github.com/apple/container/issues/402), [apple/container#656](https://github.com/apple/container/issues/656).
+
+Additionally, commercial VPNs (Mullvad, WARP, etc.) block outbound DNS to non-tunnel servers, which prevents the builder from reaching `8.8.8.8` even when configured.
+
+**Before building with Apple Container, always:**
+1. Check if the user has a VPN active. If so, `AskUserQuestion`: "Apple Container builds require external DNS access. Your VPN may block this. Can you disconnect your VPN for the duration of the build?" Wait for confirmation.
+2. Configure the builder with explicit DNS:
+   ```bash
+   container builder stop && container builder rm && container builder start --dns 8.8.8.8
+   ```
+
+**Alternative** (no builder restart needed):
+```bash
+container exec buildkit /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+```
+
+Both workarounds are confirmed to work when no VPN is blocking outbound DNS.
+
+**Then run** `npx tsx setup/index.ts --step container -- --runtime <chosen>` and parse the status block.
 
 **If BUILD_OK=false:** Read `logs/setup.log` tail for the build error.
-- Cache issue (stale layers): `docker builder prune -f` (Docker) or `container builder stop && container builder rm && container builder start` (Apple Container). Retry.
+- **DNS resolution failure:** If you see `Temporary failure resolving`, the DNS preflight above was not done or a VPN is still active. Ask the user to confirm VPN is off, re-run the DNS fix, and retry.
+- Cache issue (stale layers): `docker builder prune -f` (Docker) or `container builder stop && container builder rm && container builder start --dns 8.8.8.8` (Apple Container). Retry.
 - Dockerfile syntax or missing files: diagnose from the log and fix, then retry.
 
 **If TEST_OK=false but BUILD_OK=true:** The image built but won't run. Check logs — common cause is runtime not fully started. Wait a moment and retry the test.
